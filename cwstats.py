@@ -21,6 +21,7 @@
 from __future__ import division
 
 import sys
+from os import getpid
 import time
 import math
 from optparse import OptionParser
@@ -56,10 +57,11 @@ def main():
 	parser.add_option("-m", "--morse", action="store_true", dest="show_morse", help="show morse output")
 	parser.add_option("-o", "--outfile", dest="statfile", help="write statistics to STATFILE, for use in cwtx.py")
 	parser.add_option("-s", "--stats", action="store_true", dest="stats", help="show statistics")
-	parser.add_option("-z", "--zero", dest="minzero", help="min. allowed void size (ms)")
+	parser.add_option("-0", "--zero", dest="minzero", help="min. allowed void size (ms)")
 	parser.add_option("-a", "--align", dest="realign", help="vertically realign signal by argument (keep it small)")
 	parser.add_option("-n", "--nofilter", action="store_true", dest="nofilter", help="do not filter the signal before processing")
 	parser.add_option("-w", "--width_mul", dest="width_mul", help="filter width multiplier: width = dom. freq +/- (dom. freq * width multiplier)")
+	parser.add_option("-z", "--stdin", action="store_true", dest="stdin", help="get input from stdin instead of a file")
 	parser.add_option("-v", "--version", action="store_true", dest="showversion", help="show version information and exit")
 	(options, args) = parser.parse_args()
 
@@ -67,10 +69,13 @@ def main():
 		print "cwstats version", version
 		print "Joshua Davis (cwstats@covert.codes)"
 		exit()
-	if not options.wavfile:
-		print "** Must specify input file"
+	if not options.wavfile and not options.stdin:
+		print "** Must specify input file with -o or use the -z option"
 		print ""
 		parser.print_help()
+		exit()
+	if options.wavfile and options.stdin:
+		print "** Must us only one of -o or -z"
 		exit()
 	if not options.tolerance:
 		tolerance = float(default_tolerance)
@@ -87,10 +92,23 @@ def main():
 	if options.statfile:
 		statfile = options.statfile
 
-	wavfile = options.wavfile
+	if options.stdin:
+		print "** Reading from stdin"
+		data = sys.stdin.read()
+
+		outfile = "/tmp/cwstats"+str(getpid())
+		f = open(outfile, 'w')
+		f.write(data)
+		f.close()
+
+		wavfile = outfile
+	else:
+		wavfile = options.wavfile
+
 	data, fs, encoding = wavread(wavfile)
 	print ""
 	print "** Read", len(data), "samples from", wavfile, "with sample frequency", fs, "Hz and encoding", encoding
+
 	print "** Signal average:", np.average(data)
 
 	if options.realign:

@@ -21,6 +21,7 @@
 from __future__ import division
 
 import sys
+from os import getpid
 import time
 import math
 from optparse import OptionParser
@@ -60,8 +61,13 @@ def main():
 	parser.add_option("-f", "--freq", dest="cwfreq", help="cw frequency (e.g. 900), in Hz")
 	parser.add_option("-s", "--statfile", dest="statfile", help="read message statistics from STATFILE and characterize the output wav according to the input statistics.  See README.md")
 	parser.add_option("-w", "--wpm", dest="wpm", help="words per minute")
+	parser.add_option("-z", "--stdout", action="store_true", dest="stdout", help="send to stdout instead of a file")
 	parser.add_option("-v", "--version", action="store_true", dest="showversion", help="show version information and exit")
 	(options, args) = parser.parse_args()
+
+	if options.stdout:
+		stdoutold = sys.stdout
+		sys.stdout = open('/dev/null', 'w')
 
 	if options.showversion:
 		print "cwtx version", version
@@ -71,9 +77,12 @@ def main():
 		print "** Must specify input message"
 		parser.print_help()
 		exit()
-	if not options.outfile:
-		print "** Must specify output wav file"
+	if not options.outfile and not options.stdout:
+		print "** Must specify output wav file with -i or use the -z switch"
 		parser.print_help()
+		exit()
+	if options.outfile and options.stdout:
+		print "** Must use only one of -i or -z"
 		exit()
 	if options.cwfreq:
 		fc = float(options.cwfreq)
@@ -117,10 +126,15 @@ def main():
 		f.close()
 
 	message = options.message.lower()
-	outfile = options.outfile
+	if not options.stdout:
+		outfile = options.outfile
 
 	print ""
-	print "** Encoding Morse code to:", outfile
+	if options.outfile:
+		print "** Encoding Morse code to:", outfile
+	else:
+		print "** Sending output to stdout"
+
 	print "** Using cw frequency:", fc, "Hz"
 	if options.statfile:
 		print "** Using statistics from", options.statfile
@@ -241,7 +255,21 @@ def main():
 		for i in range(len(output)):
 			output[i] = output[i] + noise[i]
 
+	if not options.outfile:
+		outfile = "/tmp/cwtx"+str(getpid())
+
 	wavwrite(output, outfile, fs=fs, enc=encoding)
+
+	if not options.outfile:
+		sys.stdout = stdoutold
+		f = open(outfile, "r")
+		out = f.read()
+		f.close()
+
+		sys.stdout.write(out)
+		sys.stdout.flush()
+
+		exit()
 
 	print "** Finished."
 	print ""

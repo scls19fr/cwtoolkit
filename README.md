@@ -21,6 +21,4 @@ cwtx.py:    Generate Morse code and optionally apply statistical variation and n
  The -h switch gives help for any of the commands.
 
  TODO: real-time encoding and decoding for cwstats and cwtxt (with soundcard)
- 		user can add gaussian noise in cwtx
-
 
