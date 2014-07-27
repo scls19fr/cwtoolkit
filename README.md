@@ -4,6 +4,8 @@ joshua davis (cwtoolkit -at- covert.codes)
 
 This was designed for Linux, with Python 2.7
 
+Required packages include: numpy, scipy, and scikits (for audiolab)
+
 cwstats.py: Decode and generate statistics for Morse code from a wav audio file.
 			Statistics include the average and standard deviation for intervals
 			(dots, dashes, voids).
