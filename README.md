@@ -1,10 +1,12 @@
 
-cwtoolkit version 0.1
+cwtoolkit version 0.2b
 joshua davis (cwtoolkit -at- covert.codes)
 
 This was designed for Linux, with Python 2.7
+This release is a beta.  Don't use it for production.  This was created for
+a covert channel proof of concept project, which may be found on http://covert.codes
 
-Required packages include: numpy, scipy, and scikits (for audiolab)
+Required packages include: numpy, scipy, and scikits.audiolab
 
 cwstats.py: Decode and generate statistics for Morse code from a wav audio file.
 			Statistics include the average and standard deviation for intervals
@@ -21,4 +23,7 @@ cwtx.py:    Generate Morse code and optionally apply statistical variation and n
 
 
  The -h switch gives help for any of the commands.
+
+ The transmitter and receiver now include the capability to send covert messages.  This is done
+by varying the timing of the overt (carrier) message.  See -h for usage information.
 
