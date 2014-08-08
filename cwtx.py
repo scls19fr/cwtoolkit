@@ -136,7 +136,8 @@ def main():
 		amplitude = default_amplitude
 
 	if options.covert_msg:
-		covert_msg = options.covert_msg.strip()
+		covert_msg = options.covert_msg.lower()
+		covert_msg = covert_msg.strip()
 		if len(covert_msg) > len(message):
 			print "** Covert message must be shorter than the carrier message"
 			exit()
@@ -300,18 +301,18 @@ def mktime(avg, sd, symbol):
 		if symbol != '.' and symbol != '-': # don't modulate voids in the carrier
 			return wait
 
-		if cvoids[code_index-1] > 2 * stats["dotavg"] and code_index != 0: # end of a letter or word
+		if cvoids[code_index-1] > 5 * stats["dotavg"] and code_index != 0: # take care of word seperation
+			if w_compensated == 0:
+				w_compensated = 1
+				return wait + (2 * sd)
+			else:
+				w_compensated = 0
+		elif cvoids[code_index-1] > 2 * stats["dotavg"] and code_index != 0: # end of a letter
 			if compensated == 0:
 				compensated = 1
 				return wait
 			else:
 				compensated = 0
-		if cvoids[code_index-1] > 5 * stats["dotavg"] and code_index != 0: # take care of word seperation
-			if w_compensated == 0:
-				w_compensated = 1
-				return wait + (3 * sd)
-			else:
-				w_compensated = 0
 
 		if csyms[code_index] > 2 * stats["dotavg"]: # dash
 			wait = wait - sd

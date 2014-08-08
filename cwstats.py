@@ -541,6 +541,7 @@ def decode(symbols, key, statstr, msg):
 		s = s + int(ord(x))
 	np.random.seed(s)
 
+	both = 0
 	randoms = list()
 	for m in msg:	
 		if m == '.':
@@ -560,30 +561,36 @@ def decode(symbols, key, statstr, msg):
 			sd = letter_void_sd
 
 		elif m == "000":
-			#avg = word_void_avg
-			#sd = word_void_sd
-			# fix for transmitter behavior, leave it like this
-			avg = letter_void_avg
-			sd = letter_void_sd
+			avg = word_void_avg
+			sd = word_void_sd
 
-		else:
-			print "** Unhandled character (", m, ") in the message."
-			exit()
 
+		# caveat: in the transmitter's randoms array, every 00 is preceded by a 0,
+		# and every 000 is preceded by a 00.
 		if sd != 0:
+			if m == "000":
+				tmpavg = letter_void_avg
+				tmpsd = letter_void_sd
+				wait = (np.random.normal(tmpavg, tmpsd) % (2*tmpsd)) + (tmpavg-tmpsd)
+				both = 1
+
+			if m == "00" or both == 1:
+				tmpavg = inter_void_avg
+				tmpsd = inter_void_sd
+				wait = (np.random.normal(tmpavg, tmpsd) % (2*tmpsd)) + (tmpavg-tmpsd)
+				both = 0
+
 			wait = (np.random.normal(avg, sd) % (2*sd)) + (avg-sd)
 			# only need the symbol randoms and the letter space
 			if m == '.' or m == '-':
 				randoms.append(wait)
 
 	outmsg = list()
-	for i in range(len(randoms)):
-		if abs(randoms[i] - symbols[i]) > (2.5 * sd): # word seperation
+	for i in range(len(symbols)):
+		if abs(randoms[i] - symbols[i]) > (1.5 * sd): # word seperation
 			outmsg.append("000")
-		elif abs(randoms[i] - symbols[i]) > (1.5 * sd): # end of message
-			break;
 
-		if abs(randoms[i] - symbols[i]) < sd/2:
+		elif abs(randoms[i] - symbols[i]) < sd/3: # letter seperation
 			outmsg.append("00")
 
 		elif randoms[i] > symbols[i]:
@@ -595,15 +602,18 @@ def decode(symbols, key, statstr, msg):
 	letter = list()
 	decoded_message = list()
 	i = 0
-
 	while i < len(outmsg):
-		if outmsg[i] == '00':
+		if outmsg[i] == '00' or outmsg[i] == '000':
 			try:
 				alpha = morse[''.join(letter)]
 			except:
 				alpha = ' '
 
 			decoded_message.append(alpha)
+
+			if outmsg[i] == '000':
+				decoded_message.append(' ')
+
 			letter[:] = []
 			i = i + 1
 			continue
@@ -623,7 +633,7 @@ def decode(symbols, key, statstr, msg):
 			break
 
 	print ""
-	print "Decoded covert message:", ''.join(decoded_message)
+	print "Decoded:", ''.join(decoded_message)
 
 main()
 

@@ -2,9 +2,11 @@
 cwtoolkit version 0.2b
 joshua davis (cwtoolkit -at- covert.codes)
 
-This was designed for Linux, with Python 2.7
-This release is a beta.  Don't use it for production.  This was created for
-a covert channel proof of concept project, which may be found on http://covert.codes
+This was designed for Linux, with Python 2.7.  This software was created for proof-of-concept
+demonstration of a covert channel (see http://covert.codes).  This is not production grade.
+It does do a pretty good job of encoding, and decoding as long as the input isn't too noisy.
+It does have the capability of forming statistics from the CW message, which may be unique
+among such systems.
 
 Required packages include: numpy, scipy, and scikits.audiolab
 

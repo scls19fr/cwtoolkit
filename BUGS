@@ -1,0 +1,4 @@
+
+ 1) Sometimes cwstats.py takes a long time to do fft and filtering.  You can
+    use the -f option to get around this
+
