@@ -1,12 +1,15 @@
 
-cwtoolkit version 0.2b
+cwtoolkit version 0.3b
 joshua davis (cwtoolkit -at- covert.codes)
+
+ ** Introduction **
 
 This was designed for Linux, with Python 2.7.  This software was created for proof-of-concept
 demonstration of a covert channel (see http://covert.codes).  This is not production grade.
 It does do a pretty good job of encoding, and decoding as long as the input isn't too noisy.
 It does have the capability of forming statistics from the CW message, which may be unique
-among such systems.
+among such systems.  If you have trouble using the decoder, adjust the amplification, offset,
+and other relevant parameters.
 
 Required packages include: numpy, scipy, and scikits.audiolab
 
@@ -24,8 +27,34 @@ cwtx.py:    Generate Morse code and optionally apply statistical variation and n
 			statistics in STATFILE.  We use a normal distribution for this.
 
 
+  ** Usage **
+
  The -h switch gives help for any of the commands.
 
  The transmitter and receiver now include the capability to send covert messages.  This is done
 by varying the timing of the overt (carrier) message.  See -h for usage information.
+
+
+ ** Transmitting and recovering covert messages **
+
+ Send a covert message like this:
+    $ ./cwtx.py -m "this is a cover message" -o message.wav -s statfile -c "covert message" -k "secret"
+
+ The covert message must be shorter than the cover message.
+
+ Recovering a covert message is more difficult, due to sampling in digital systems, and radio
+ effects on the signal.  See the paper on http://covert.codes for a more detailed explaination.
+
+ First, try this:
+    $ ./cwstats.py -i message.wav -c statfile -k "secret"
+
+ Then mess with the tolerance and the filter.  For a weak signal you may have to turn off the filter
+ and reduce the tolerance, even to get the *overt* message:
+    $ ./cwstats.py -i message.wav -c statfile -k "secret" -n -t 0.9
+
+
+ ** References **
+
+ http://www.kent-engineers.com/codespeed.htm
+ https://en.wikipedia.org/wiki/Morse_code
 

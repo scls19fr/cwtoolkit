@@ -30,7 +30,7 @@ import scipy.signal as signal
 from scikits.audiolab import wavread, wavwrite
 from hashlib import sha1
 
-version = "0.2b, August 2014"
+version = "0.3b, August 2014"
 encoding = "pcm16"
 default_fs = 8000 # hz
 default_fc = 900 # hz

@@ -31,10 +31,11 @@ import scipy.signal as signal
 from scikits.audiolab import wavread, wavwrite
 from hashlib import sha1
 
-version = "0.2b, August 2014"
-default_tolerance = 0.30
-default_filter_multiple = 0.05 # dominant frequency +/- (this * dom. freq) defines filter width
-numtaps = 10 # for the filters.  just a guess.
+version = "0.3b, August 2014"
+default_tolerance = 20
+maxwpm = 50 # safe to leave it at 50
+filter_bw = maxwpm * 4
+default_window_alts = 2 # number of fc to include in window when transforming signal->rectangles
 
 morse = {
 	".-" : "a", "-..." : "b", "-.-." : "c", "-.." : "d",
@@ -53,17 +54,16 @@ morse = {
 def main():
 	parser = OptionParser()
 	parser.add_option("-i", "--input", dest="wavfile", help="input wav file")
-	parser.add_option("-t", "--tolerance", dest="tolerance", help="signal level tolerance (adjust until the number of output codes matches the number of codes in the audio recording)")
-	parser.add_option("-f", "--frequency", dest="frequency", help="dominant frequency (Hz)")
-	parser.add_option("-m", "--morse", action="store_true", dest="show_morse", help="show morse output")
+	parser.add_option("-t", "--tolerance", dest="tolerance", help="signal level tolerance (usually <= 30)")
+	parser.add_option("-W", "--window-alts", dest="window_alts", help="window size in alternations of carrier (increase if you have trouble detecting, e.g. to 3 or 4)")
+	parser.add_option("-f", "--frequency", dest="frequency", help="dominant frequency override (Hz)")
+	parser.add_option("-m", "--morse", action="store_true", dest="show_morse", help="show Morse output")
 	parser.add_option("-o", "--outstats", dest="statfile", help="write statistics to STATFILE, for use in cwtx.py")
 	parser.add_option("-s", "--stats", action="store_true", dest="stats", help="show statistics")
-	parser.add_option("-0", "--zero", dest="minzero", help="Use if you have a problem decoding.  Postprocessing min. allowed void size (ms).  An example might be 3 ms.")
-	parser.add_option("-a", "--align", dest="realign", help="vertically realign signal by argument (keep it small)")
-	parser.add_option("-A", "--amplify", dest="amplify", help="amplify (multiply) the signal by this number before filtering")
-	parser.add_option("-n", "--nofilter", action="store_true", dest="nofilter", help="do not filter the signal before processing")
+	parser.add_option("-a", "--align", dest="realign", help="vertically realign signal by argument")
+	parser.add_option("-n", "--nofilter", action="store_true", dest="nofilter", help="do not filter the signal before processing.  Try this if you have problems decoding a weak signal.")
 	parser.add_option("-w", "--width_mul", dest="width_mul", help="filter width multiplier: width = dom. freq +/- (dom. freq * width multiplier)")
-	parser.add_option("-p", "--parseout", dest="parsed_file", help="save the filtered and amplified input file")
+	parser.add_option("-p", "--parseout", dest="parsed_file", help="save the filtered input file")
 	parser.add_option("-S", "--stdin", action="store_true", dest="stdin", help="get input from stdin instead of a file")
 	parser.add_option("-c", "--covert_stats", dest="cstats", help="file with statistics, needed to recover covert message")
 	parser.add_option("-k", "--key", dest="code_key", help="key for use in recovering a covert message")
@@ -74,28 +74,47 @@ def main():
 		print "cwstats version", version
 		print "Joshua Davis (cwstats@covert.codes)"
 		exit()
+
 	if not options.wavfile and not options.stdin:
 		print "** Must specify an input file with -o or use the -z option"
 		print ""
 		parser.print_help()
 		exit()
+
 	if options.wavfile and options.stdin:
 		print "** Must us only one of -o or -z"
 		exit()
-	if not options.tolerance:
-		tolerance = float(default_tolerance)
+
+	if options.tolerance:
+		tolerance = float(options.tolerance)/100
+		if tolerance > 1:
+			print "** Tolerance must be between 0 and 100"
+			exit()
 	else:
-		tolerance = float(options.tolerance)
-	if options.width_mul:
-		filter_multiple = float(options.width_mul)
-	else:
-		filter_multiple = float(default_filter_multiple)
+		tolerance = float(default_tolerance)/100
+
 	if options.statfile:
 		statfile = options.statfile
-	if options.code_key:
-		if not options.cstats:
-			print "** Must use the -c option when decoding a coded message"
+
+	if options.window_alts:
+		window_alts = int(options.window_alts)
+	else:
+		window_alts = int(default_window_alts)
+
+	if options.code_key or options.cstats:
+		if not options.code_key or not options.cstats:
+			print "** The -c and -k options must be used together"
 			exit()
+
+		try:
+			f = open(options.cstats, "r")
+		except:
+			print "** Could not open", options.cstats, "for reading"
+			exit()
+
+		statstr = f.read()
+		f.close()
+		print "** Read statistics for covert demodulation from", options.cstats
 
 	if options.stdin:
 		print "** Reading from stdin"
@@ -110,21 +129,6 @@ def main():
 	else:
 		wavfile = options.wavfile
 
-	if options.cstats:
-		if not options.code_key:
-			print "** Must use the -c option with the -k option"
-			exit()
-
-		try:
-			f = open(options.cstats, "r")
-		except:
-			print "** Could not open", options.cstats, "for reading"
-			exit()
-
-		statstr = f.read()
-		f.close()
-		print "** Read statistics for covert demodulation from", options.cstats
-
 	data, fs, encoding = wavread(wavfile)
 	print ""
 	print "** Read", len(data), "samples from", wavfile, "with sample frequency", fs, "Hz and encoding", encoding
@@ -138,259 +142,91 @@ def main():
 		print "** Signal average:", np.average(data)
 
 	# want mono
-	mono = 0
 	try:
-		x = data[0][1]
-	except:
-		mono = 1
-
-	if mono == 0:
-		print "** Converting to mono"
 		tmp = list()
 		for d in data:
 			tmp.append(d[0])
-
 		data = np.array(tmp)
+	except:
+		# already mono
+		pass
 
-	if options.amplify:
-		print "** Amplifying signal by", options.amplify
-		i = 0
-		for d in data:
-			data[i] = d * float(options.amplify)
-			i = i + 1
-
-	if not options.frequency:
-		# get frequency information
+	if options.frequency:
+		fc = float(options.frequency)
+	else:
 		freqs = np.fft.fft(data)
 		fdomain = np.fft.fftfreq(len(data))
 		index = np.argmax(np.abs(freqs)**2)
-		fc = abs(fdomain[index] * fs)
-	else:
-		fc = float(options.frequency)
-	print "** Using dominant frequency:", int( round(fc) ), "Hz"
+		fc = int(round(abs(fdomain[index] * fs)))
 
 	if fc == 0:
-		print "** WARNING: Dominant frequency is zero.  Vertically realigning the signal with -a may fix this.  You can also specify a dominant frequency with -f.  Exiting."
+		print "** Dominant frequency is zero.  Vertically realigning the signal with -a may fix this.  You can also specify a dominant frequency with -f."
 		exit()
+	else:
+		print "** Using dominant frequency:", fc, "Hz"
 
-	if not options.nofilter:
-		# filter the signal
-		f_nyq = fs/2
-		f_cutoff_h = int(fc + (fc*filter_multiple)) # hz
-		f_cutoff_l = int(fc - (fc*filter_multiple))
+	if options.nofilter:
+		filtered_signal = data
+	else:
+		f_cutoff_h = int(fc + filter_bw/2)
+		f_cutoff_l = int(fc - filter_bw/2)
 		print "** Filtering to between", f_cutoff_l, "and", f_cutoff_h, "Hz"
 
-		# band-pass
-		fir_coeff = signal.firwin(numtaps, [f_cutoff_l/f_nyq, f_cutoff_h/f_nyq], pass_zero=False)
-		filtered_signal = signal.lfilter(fir_coeff, 1.0, data)
-	else:
-		filtered_signal = data
+		f_nyq = fs/2
+		numtaps = fs/f_cutoff_l
 
-	data = filtered_signal
+		fir_coeff = signal.firwin(numtaps, [f_cutoff_l/f_nyq, f_cutoff_h/f_nyq], window='blackmanharris', pass_zero=False, nyq=f_nyq)
+		filtered_signal = signal.lfilter(fir_coeff, 1.0, data)
+		data = filtered_signal
 
 	if options.parsed_file:
 		wavwrite(filtered_signal, options.parsed_file, fs)
 
-	# turn the signal into rectangles
-	rects = list()
-	found = 0
-	winsz = int( math.ceil(fs/fc) )
-	winnum = int( math.floor(len(data)/winsz) )
-	remainder = len(data) % winsz
-	for i in range(winnum):
-		for m in range(winsz):
-			index = (i * winsz) + m
-			if( (abs(data[index])) > tolerance):
-				found = 1
-				break
+	# Turn the filtered signal into symbols
+	rects = signal_to_rects(data, tolerance, fs, fc, window_alts)
+	symbols,voids = rects_to_symbols(rects, fs)
+	dots,dashes = symbols_to_beeps(symbols)
 
-		if found == 1:
-			num = 1
-			found = 0
-		else:
-			num = 0
-
-		rects.extend(num for o in range(winsz))
-	
-	if remainder > 0:
-		for m in range(winsz * winnum, (winsz * winnum) + remainder):
-			if(data[m] > tolerance):
-				found = 1
-				break
-
-		if found == 1:
-			num = 1
-		else:
-			num = 0
-
-		rects.extend(num for o in range(winsz))
-
-	if options.minzero:
-		print "** Filling gaps smaller than", options.minzero, "ms"
-
-		minzero = options.minzero
-		samples_per_ms = fs/1000
-		min_zero_samples = int( math.ceil(samples_per_ms * int(minzero)) )
-		counter = 0
-		exceeded = 0
-		zeros = 0
-		last_number = rects[0]
-		for i in range(1, len(rects)):
-			if rects[i] == 0:
-				if last_number == 0:
-					zeros = zeros + 1
-
-					if zeros == min_zero_samples:
-						exceeded = 1
-				else:
-					last_number = 0
-					zeros = 1
-					counter = i
-					exceeded = 0
-			else: # rects[i] == 1
-				if last_number == 0 and exceeded == 0:
-					for w in range(counter, i):
-						rects[w] = 1
-				last_number = 1
-
-	starts_with = rects[0]
-
-	print "** Decoding with tolerance: %.3f" % tolerance
-
-	symbols = list()
-	voids = list()
-	base = 0
-	i = 0
-	index = 0
-	previous = 0
-	samples = 0
-	for r in rects:
-		i = i + 1
-
-		if r == 1:
-			if previous == 1:
-				index = index + 1
-				samples = index - base # in case this is the last symbol
-				continue # continuing a symbol
-
-			else: # started a symbol, ended a void
-				samples = index - base
-				t = samples / (fs/1000)
-				if t > 0:
-					voids.append(t)
-
-				index = base = i
-				previous = 1
-
-		else: # r == 0
-			if previous == 1: # started a void, finished a symbol
-				samples = index - base
-				t = samples / (fs/1000)
-				symbols.append(t)
-
-				index = base = i
-				previous = 0
-			else: # continuing a void
-				index = index + 1
-				samples = index - base
-				continue
-
-	# Handle the case of a final symbol (symbol ends the wav)
-	if r == 1:
-		t = samples / (fs/1000)
-		symbols.append(t)
-
-	total = 0
-	for v in voids:
-		total = total + v
-	for s in symbols:
-		total = total + s
-
-	if not symbols:
-		print "** No symbols found in message."
+	if not dots:
+		print "** No symbols found in input"
 		exit()
-	if not voids:
-		print "** No gaps found in message."
 
-	# figure out what's a dot, what's a dash, what's a short void, and what's a long void
-	# dashes are supposed to be 3x dot length
-	# inter-element voids are 1x dot length, inter-character 3x, inter-word 7x
-	dash_ref = 0
-	dot_ref = 0
-	ref = symbols[0]
-	for i in range(1, len(symbols)):
-		if symbols[i] > 2*ref:
-			dash_ref = symbols[i]
-		elif ref > 2*symbols[i]:
-			dot_ref = symbols[i]
+	dotavg = np.average(dots)
+	print "** Avg. dot length:", dotavg, "ms"
 
-		ref = symbols[i]
+	# Remove any leading or trailing voids
+	if rects[0] == 0:
+		voids.pop(0)
+	
+	print "** Decoding with tolerance:", tolerance, "%"
 
-		if dot_ref and dash_ref:
-			break
-
-	if dash_ref == 0 or dot_ref == 0:
-		print "** All symbols are the same.  Assuming dots."
-		if not dot_ref:
-			dot_ref = symbols[0]
-
-	void_s_ref = 0
-	void_m_ref = 0
-	void_l_ref = 0
+	# categorize voids, for statistics
 	lvoids = list()
 	mvoids = list()
 	svoids = list()
-	ref = min(voids)
-	if starts_with == 0: # skip any initial void
-		s = 1
-	else:
-		s = 0
-	
-	ref = min(voids)
-	for i in range(s, len(voids)):
-		if voids[i] > 5*ref:
-			void_l_ref = voids[i]
+	for i in range(len(voids)):
+		if voids[i] > 5*dotavg:
 			lvoids.append(voids[i])
-		elif voids[i] > 2*ref:
-			void_m_ref = voids[i]
+		elif voids[i] > 2*dotavg:
 			mvoids.append(voids[i])
 		else:
-			void_s_ref = voids[i]
 			svoids.append(voids[i])
 	
-	if void_l_ref == 0:
-		print "** No word delineation detected."
+	if not lvoids:
+		print "** No word delineation detected in message."
+	if not mvoids:
+		print "** No letter delineation detected in message."
+	if not svoids:
+		print "** No symbol delineation detected in message."
 
-	if starts_with == 0: # remove the first void
-		voids.pop(0)
+	code = symbols_to_morse(symbols, voids, dotavg)
 
-	dots = list()
-	dashes = list()
-	msg = list()
-	for i in range(0, len(symbols)):
-		if symbols[i] < 2*dot_ref:
-			msg.append('.')
-			dots.append(symbols[i])
-		else:
-			msg.append('-')
-			dashes.append(symbols[i])
-
-		try:
-			if voids[i] < 2 * void_s_ref:
-				msg.append('0')
-			elif voids[i] < 5 * void_s_ref:
-				msg.append('00')
-			else:
-				msg.append('000')
-		except: # fails at the end b/c we stripped away beginning and trailing voids
-			pass
-
+	# make the statistics
 	dotavg, dotsd = morsestats(dots)
 	dashavg, dashsd = morsestats(dashes)
 	lvoidavg, lvoidsd = morsestats(lvoids)
 	mvoidavg, mvoidsd = morsestats(mvoids)
 	svoidavg, svoidsd = morsestats(svoids)
-
 	duration = len(data)/fs
 	epm = (len(symbols)*60)/duration
 
@@ -409,7 +245,7 @@ def main():
 		print "| Number of intra-letter spaces", len(svoids)
 		print "| Avg. intra-letter spacing length:", svoidavg, "ms"
 		print "| Intra-letter spacing stdev:", svoidsd, "ms"
-		print"|"
+		print "|"
 		print "| Number of inter-letter spaces:", len(mvoids)
 		print "| Avg. inter-letter spacing length:", mvoidavg, "ms"
 		print "| Inter-letter spacing stdev:", mvoidsd, "ms"
@@ -427,6 +263,7 @@ def main():
 			f = open(statfile, "w")
 		except:
 			print "** Could not open", statfile, "for writing"
+			exit()
 
 		statstr = "%.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f"\
 			% (dotavg, dotsd, dashavg, dashsd, svoidavg, svoidsd, mvoidavg, mvoidsd, lvoidavg, lvoidsd)
@@ -434,85 +271,40 @@ def main():
 		f.close()
 		print "** Wrote statistics to", statfile
 
-	letter = list()
-	message = list()
-	i = 0
-	while i < len(msg):
-		if msg[i] == '0':
-			i = i + 1
-			continue
 
-		if msg[i] == '00':
-			# letter seperation
-			try:
-				alpha = morse[''.join(letter)]
-			except:
-				alpha = '?'
 
-			message.append(alpha)
-			letter[:] = []
-			i = i + 1
-			continue
 
-		if msg[i] == '000':
-			# word seperation
-			try:
-				alpha = morse[''.join(letter)]
-			except:
-				alpha = '?'
+	message = morse_to_english(code)
 
-			message.append(alpha)
-			letter[:] = []
-			message.append(' ')
-			i = i + 1
-			continue
-
-		letter.append(msg[i])
-		i = i + 1
-
-	# print out the final letter
-	try:
-		alpha = morse[''.join(letter)]
-	except:
-		alpha = '?'
-	message.append(alpha)
-
-	long_voids = list()
-	medium_voids = list()
-	small_voids = list()
-	for v in voids:
-		if v > 5 * void_s_ref:
-			long_voids.append(v)
-		elif v > 2 * void_s_ref:
-			medium_voids.append(v)
-		else:
-			small_voids.append(v)
-
-	# show morse if they want it
-	if options.show_morse == 1:
-		print ""
-		for m in msg:
-			if m == '0':
+	if options.show_morse:
+		sys.stdout.write('** Morse: ')
+		for i in range(len(code)):
+			if code[i] == '0':
 				pass
-			elif m == '00':
+			elif code[i] == '00':
 				sys.stdout.write(' ')
-			elif m == '000':
+			elif code[i] == '000':
 				sys.stdout.write(' [word gap] ')
 			else:
-				sys.stdout.write(m)
+				sys.stdout.write(code[i])
 
-			sys.stdout.flush()
+		print ""
 
 	print ""
-	print "Message:", ''.join(message)
+	print "@@ Message:", message
 
 	if options.code_key:
-		decode(symbols, options.code_key, statstr, msg)
+		decoded = decode(symbols, options.code_key, statstr, code)
+		print "@@ Decoded:", decoded
 	print ""
 
 	print "** Finished"
 	print ""
 
+#
+# Input a list of times
+# Return average and SD
+#
 def morsestats(input):
 	if not input:
 		return float(0), float(0)
@@ -521,7 +313,11 @@ def morsestats(input):
 
 	return avg, sd
 
-def decode(symbols, key, statstr, msg):
+#
+# Input a cover message modulated with our transmitter
+# Return the covert message
+#
+def decode(symbols, key, statstr, code):
 	floats = map(float, statstr.split(","))
 	dotavg = floats[0]
 	dotsd = floats[1]
@@ -543,38 +339,38 @@ def decode(symbols, key, statstr, msg):
 
 	both = 0
 	randoms = list()
-	for m in msg:	
-		if m == '.':
+	for c in code:	
+		if c == '.':
 			avg = dotavg
 			sd = dotsd
 
-		elif m == '-':
+		elif c == '-':
 			avg = dashavg
 			sd = dashsd
 
-		elif m == '0':
+		elif c == '0':
 			avg = inter_void_avg
 			sd = inter_void_sd
 
-		elif m == "00":
+		elif c == "00":
 			avg = letter_void_avg
 			sd = letter_void_sd
 
-		elif m == "000":
+		elif c == "000":
 			avg = word_void_avg
 			sd = word_void_sd
 
 
-		# caveat: in the transmitter's randoms array, every 00 is preceded by a 0,
-		# and every 000 is preceded by a 00.
+		# In the transmitter's randoms array, every 00 is preceded by a 0,
+		# and every 000 is preceded by a 00, so compensate for this here
 		if sd != 0:
-			if m == "000":
+			if c == "000":
 				tmpavg = letter_void_avg
 				tmpsd = letter_void_sd
 				wait = (np.random.normal(tmpavg, tmpsd) % (2*tmpsd)) + (tmpavg-tmpsd)
 				both = 1
 
-			if m == "00" or both == 1:
+			if c == "00" or both == 1:
 				tmpavg = inter_void_avg
 				tmpsd = inter_void_sd
 				wait = (np.random.normal(tmpavg, tmpsd) % (2*tmpsd)) + (tmpavg-tmpsd)
@@ -582,7 +378,7 @@ def decode(symbols, key, statstr, msg):
 
 			wait = (np.random.normal(avg, sd) % (2*sd)) + (avg-sd)
 			# only need the symbol randoms and the letter space
-			if m == '.' or m == '-':
+			if c == '.' or c == '-':
 				randoms.append(wait)
 
 	outmsg = list()
@@ -590,7 +386,7 @@ def decode(symbols, key, statstr, msg):
 		if abs(randoms[i] - symbols[i]) > (1.5 * sd): # word seperation
 			outmsg.append("000")
 
-		elif abs(randoms[i] - symbols[i]) < sd/3: # letter seperation
+		elif abs(randoms[i] - symbols[i]) < sd/2: # letter seperation
 			outmsg.append("00")
 
 		elif randoms[i] > symbols[i]:
@@ -600,7 +396,7 @@ def decode(symbols, key, statstr, msg):
 			outmsg.append('.')
 
 	letter = list()
-	decoded_message = list()
+	decoded = list()
 	i = 0
 	while i < len(outmsg):
 		if outmsg[i] == '00' or outmsg[i] == '000':
@@ -609,10 +405,10 @@ def decode(symbols, key, statstr, msg):
 			except:
 				alpha = ' '
 
-			decoded_message.append(alpha)
+			decoded.append(alpha)
 
 			if outmsg[i] == '000':
-				decoded_message.append(' ')
+				decoded.append(' ')
 
 			letter[:] = []
 			i = i + 1
@@ -621,19 +417,211 @@ def decode(symbols, key, statstr, msg):
 		letter.append(outmsg[i])
 		i = i + 1
 
-	decoded_message = ''.join(decoded_message)
+	decoded = ''.join(decoded)
 
 	# remove trailing '?'s (not applicable now)
-	i = len(decoded_message)-1
+	i = len(decoded)-1
 	while i != 0:
-		if decoded_message[i] == '?':
-			decoded_message = decoded_message[0:i]
+		if decoded[i] == '?':
+			decoded = decoded[0:i]
 			i = i - 1
 		else:
 			break
 
-	print ""
-	print "Decoded:", ''.join(decoded_message)
+	return decoded
 
+#
+# Take a signal (from a wav file)
+# Return a list of ones and zeros
+# Ones where the abs of signal is above the threshold
+#
+def signal_to_rects(signal, tolerance, fs, fc, window_alts):
+	winsz =  window_alts * int( math.ceil(fs/fc) ) # window_alts alternations of the signal
+	winnum = int( math.floor(len(signal)/winsz) )
+
+	print "** Signal alternations per window:", window_alts
+
+	rects = list()
+	for i in range(winnum):
+		num = 0
+		samples = list()
+		for m in range(winsz):
+			try: # fails if a remainder, at the end
+				samples.append(abs(signal[(i*winsz) + m]))
+			except:
+				pass
+
+		if np.average(samples) > tolerance:
+			num = 1
+			samples[:] = []
+			#if(abs(signal[(i * winsz) + m]) >= tolerance):
+			#	num = 1
+			#	break
+
+		for k in range(winsz):
+			try: # because fails if len(signal) % winsz, at the end
+				rects.append(num)
+			except:
+				pass
+
+	#print_rects(rects)
+	#exit()
+	return rects
+
+#
+# Take a list of ones and zeros
+# Return a list of symbol times
+#
+def rects_to_symbols(rects,fs):
+	count = 0
+	symbols = list()
+	voids = list()
+	for i in range(len(rects)):
+		if rects[i] == 1:
+			if rects[i-1] == 0:
+				voids.append(count*(1/fs)*1000)
+				count = 1
+			else:
+				count = count + 1
+		else:
+			if rects[i-1] == 1:
+				symbols.append(count*(1/fs)*1000)
+				count = 1
+			else:
+				count = count + 1
+
+	return symbols, voids
+
+#
+# Input a list of message times
+# Output dots and dashes in seperate lists
+#
+def symbols_to_beeps(symbols):
+	ref = 0
+	for i in range(len(symbols)-1):
+		if int(symbols[i]) != 0 and symbols[i+1]/symbols[i] > 2:
+			ref = symbols[i]
+			break
+		elif int(symbols[i+1]) != 0 and symbols[i]/symbols[i+1] > 2:
+			ref = symbols[i+1]
+			break
+
+	dots = list()
+	dashes = list()
+	for s in symbols:
+		if not s > 2 * ref:
+			dots.append(s)
+		else:
+			dashes.append(s)
+	
+	return dots, dashes
+
+#
+# Input a list of times
+# Output dots, dashes, and various voids
+#
+def symbols_to_morse(symbols, voids, dotavg):
+	morse = list()
+	for i in range(0, len(symbols)):
+		if symbols[i] < 2*dotavg:
+			morse.append('.')
+		else:
+			morse.append('-')
+
+		try:
+			if voids[i] < 2 * dotavg:
+				morse.append('0')
+			elif voids[i] < 5 * dotavg:
+				morse.append('00')
+			else:
+				morse.append('000')
+		except: # fails at the end b/c we stripped away beginning and trailing voids
+			pass
+	return morse
+
+#
+# Input a list of dots, dashes, and various voids
+# Output a message
+#
+def morse_to_english(morse_input):
+	letter = list()
+	message = list()
+	i = 0
+	while i < len(morse_input):
+		if morse_input[i] == '0':
+			i = i + 1
+
+		elif morse_input[i] == '00':
+			# letter seperation
+			try:
+				alpha = morse[''.join(letter)]
+			except:
+				alpha = '?'
+
+			message.append(alpha)
+			letter[:] = []
+			i = i + 1
+
+		elif morse_input[i] == '000':
+			# word seperation
+			try:
+				alpha = morse[''.join(letter)]
+			except:
+				alpha = '?'
+
+			message.append(alpha)
+			message.append(' ')
+			letter[:] = []
+			i = i + 1
+		else:
+			letter.append(morse_input[i])
+			i = i + 1
+
+	# print out the final letter
+	try:
+		alpha = morse[''.join(letter)]
+	except:
+		alpha = '?'
+	
+	message.append(alpha)
+
+	return ''.join(message)
+
+######################
+# Troubleshooting functions
+######################
+
+#
+# Input: rectangles list
+# Output: human-readable rectangles list
+#
+def print_rects(rects):
+	count = 0
+	ones = 0
+	symbols = 0
+	results = list()
+	for i in range(len(rects)):
+		if rects[i] == 1:
+			if ones == 0:
+				string = "0:"+str(count)
+				results.append(string)
+				count = 0
+				ones = 1
+				symbols = symbols + 1
+			count = count + 1
+		else:
+			if ones == 1:
+				string = "1:"+str(count)
+				results.append(string)
+				count = 0
+				ones = 0
+			count = count + 1
+
+	print results
+	print ""
+	print "symbols in rects:", symbols
+
+
+#########
 main()
 
