@@ -1,8 +1,11 @@
 
 cwtoolkit version 0.3b
+======================
+
 joshua davis (cwtoolkit -at- covert.codes)
 
- ** Introduction **
+ Introduction
+ ------------
 
 This was designed for Linux, with Python 2.7.  This software was created for proof-of-concept
 demonstration of a covert channel (see http://covert.codes).  This is not production grade.
@@ -27,7 +30,8 @@ cwtx.py:    Generate Morse code and optionally apply statistical variation and n
 			statistics in STATFILE.  We use a normal distribution for this.
 
 
-  ** Usage **
+  Usage
+  -----
 
  The -h switch gives help for any of the commands.
 
@@ -35,26 +39,28 @@ cwtx.py:    Generate Morse code and optionally apply statistical variation and n
 by varying the timing of the overt (carrier) message.  See -h for usage information.
 
 
- ** Transmitting and recovering covert messages **
+ Transmitting and recovering covert messages
+ -------------------------------------------
 
  Send a covert message like this:
-    $ ./cwtx.py -m "this is a cover message" -o message.wav -s statfile -c "covert message" -k "secret"
+    `$ ./cwtx.py -m "this is a cover message" -o message.wav -s statfile -c "covert message" -k "secret"`
 
  The covert message must be shorter than the cover message.
 
  Recovering a covert message is more difficult, due to sampling in digital systems, and radio
  effects on the signal.  See the paper on http://covert.codes for a more detailed explaination.
 
- First, try this:
-    $ ./cwstats.py -i message.wav -c statfile -k "secret"
+ First, try this:  
+    `$ ./cwstats.py -i message.wav -c statfile -k "secret"`
 
  Then mess with the tolerance and the filter.  For a weak signal you may have to turn off the filter
- and reduce the tolerance, even to get the *overt* message:
-    $ ./cwstats.py -i message.wav -c statfile -k "secret" -n -t 0.9
+ and reduce the tolerance, even to get the *overt* message:  
+    `$ ./cwstats.py -i message.wav -c statfile -k "secret" -n -t 0.9`
 
 
- ** References **
+ References
+ ----------
 
- http://www.kent-engineers.com/codespeed.htm
+ http://www.kent-engineers.com/codespeed.htm  
  https://en.wikipedia.org/wiki/Morse_code
 
