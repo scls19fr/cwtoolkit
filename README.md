@@ -2,7 +2,7 @@
 cwtoolkit version 0.3b
 ======================
 
-joshua davis (cwtoolkit -at- covert.codes)
+joshua davis (cwtoolkit -*- covert.codes)
 
  Introduction
  ------------
