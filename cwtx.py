@@ -1,6 +1,6 @@
 #!/usr/bin/python2.7
 #
-# Joshua Davis (cwstats@covert.codes)
+# Joshua Davis (cwstats - covert.codes)
 # cwtx - transmit morse code with parameters and statistical attributes
 #
 # Copyright (C) 2014, Joshua Davis
@@ -89,7 +89,7 @@ def main():
 		sys.stdout = open('/dev/null', 'w')
 	if options.showversion:
 		print "cwtx version", version
-		print "Joshua Davis (cwstats@covert.codes)"
+		print "Joshua Davis (cwstats - covert.codes)"
 		exit()
 	if options.message:
 		message = options.message.lower()

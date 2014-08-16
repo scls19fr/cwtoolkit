@@ -1,6 +1,6 @@
 #!/usr/bin/python2.7
 #
-# Joshua Davis (cwstats@covert.codes)
+# Joshua Davis (cwstats - covert.codes)
 # cwstats - decode morse code and optionally generate statistics
 #
 # Copyright (C) 2014, Joshua Davis
@@ -72,7 +72,7 @@ def main():
 
 	if options.showversion:
 		print "cwstats version", version
-		print "Joshua Davis (cwstats@covert.codes)"
+		print "Joshua Davis (cwstats - covert.codes)"
 		exit()
 
 	if not options.wavfile and not options.stdin:
