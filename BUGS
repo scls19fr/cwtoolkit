@@ -2,3 +2,6 @@
  1) Sometimes cwstats.py takes a long time to do fft and filtering.  You can
     use the -f option to get around this
 
+ 2) Adding noise isn't really working now -- it seems to just destroy the
+    entire signal, but I haven't really looked at it much
+
