@@ -5,3 +5,8 @@
  2) Adding noise isn't really working now -- it seems to just destroy the
     entire signal, but I haven't really looked at it much
 
+ 3) Fix the tolerance setting.  It's sort of meaningless now as it seems
+    that either a signal works up to ~100, or only works at around 1-2
+
+ 4) cwstats still has trouble decoding noisy signals from off the radio
+

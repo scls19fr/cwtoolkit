@@ -117,9 +117,9 @@ def main():
 	print "** Using coding frequency", fc, "Hz"
 
 	if options.sample_freq:
-		fs = options.sample_freq
+		fs = int(options.sample_freq)
 	else:
-		fs = default_fs
+		fs = int(default_fs)
 	print "** Using sampling frequency", fs, "Hz"
 
 	if options.wpm:
@@ -252,7 +252,7 @@ def main():
 		noise_avg, noise_sd = options.noise.split(',')
 
 		# save the prng state
-		r = np.random(RandomState())
+		r = np.random.RandomState()
 		state = r.get_state()
 		noise = np.random.normal(noise_avg, noise_sd, len(output))
 		r.set_state(state)
