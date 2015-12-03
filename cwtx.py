@@ -189,7 +189,7 @@ def main():
             stats["word_void_avg"] = stats["dotavg"] * 7
 
     else: # not using a stats file
-        print("** Speed:", wpm, "wpm")
+        print("** Speed: %s wpm" % wpm)
         # element time based on http://www.kent-engineers.com/codespeed.htm
         elements_per_minute = wpm * 50 # 50 codes in PARIS
         element_ms = float(60 / elements_per_minute) * 1000 # 60 seconds
@@ -390,7 +390,7 @@ def mkmorse(message, is_coded):
                     voids.append(inter_void)
 
                 else:
-                    print("** Bad symbol in dictionary lookup for", m)
+                    print("** Bad symbol in dictionary lookup for %s" % m)
                     exit()
 
             voids.pop(-1) # remove last inter_void
