@@ -138,7 +138,7 @@ def main():
     print("** Signal average: %s" % np.average(data))
 
     if options.realign:
-        print("** Vertically realigning signal by", options.realign)
+        print("** Vertically realigning signal by %s" % options.realign)
         for i in range(len(data)):
             data[i] = data[i] + float(options.realign)
         print("** Signal average: %s" % np.average(data))
@@ -264,14 +264,14 @@ def main():
         try:
             f = open(statfile, "w")
         except:
-            print("** Could not open", statfile, "for writing")
+            print("** Could not open %s for writing")
             exit()
 
         statstr = "%.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f"\
             % (dotavg, dotsd, dashavg, dashsd, svoidavg, svoidsd, mvoidavg, mvoidsd, lvoidavg, lvoidsd)
         f.write(statstr)
         f.close()
-        print("** Wrote statistics to", statfile)
+        print("** Wrote statistics to %s" % statfile)
 
 
 
@@ -441,7 +441,7 @@ def signal_to_rects(signal, tolerance, fs, fc, window_alts):
     winsz =  window_alts * int( math.ceil(fs/fc) ) # window_alts alternations of the signal
     winnum = int( math.floor(len(signal)/winsz) )
 
-    print("** Signal alternations per window:", window_alts)
+    print("** Signal alternations per window: %s" % window_alts)
 
     rects = list()
     for i in range(winnum):
@@ -621,7 +621,7 @@ def print_rects(rects):
 
     print(results)
     print("")
-    print("symbols in rects:", symbols)
+    print("symbols in rects: %s" % symbols)
 
 
 #########
