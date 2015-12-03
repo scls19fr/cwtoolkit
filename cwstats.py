@@ -264,7 +264,7 @@ def main():
         try:
             f = open(statfile, "w")
         except:
-            print("** Could not open %s for writing")
+            print("** Could not open %s for writing" % statfile)
             exit()
 
         statstr = "%.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f"\
