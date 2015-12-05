@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>
 
-from __future__ import division
+from __future__ import division, print_function
 
 import sys
 from os import getpid
@@ -27,10 +27,7 @@ import math
 from optparse import OptionParser
 import numpy as np
 import scipy.signal as signal
-import scipy
 import scipy.io.wavfile
-
-#from scikits.audiolab import wavread, wavwrite
 from hashlib import sha1
 
 version = "0.3b, August 2014"
@@ -87,7 +84,7 @@ def main():
     (options, args) = parser.parse_args()
 
     if options.stdout:
-        # don't print messages to stdout if writing file to stdout
+        # don't print(messages to stdout if writing file to stdout
         stdoutold = sys.stdout
         sys.stdout = open('/dev/null', 'w')
     if options.showversion:
@@ -110,20 +107,20 @@ def main():
         exit()
     if options.outfile:
         outfile = options.outfile
-        print("** Saving output to %s" % outfile)
+        print("** Saving output to", outfile)
     else:
         print("** Sending output to stdout")
     if options.cwfreq:
         fc = float(options.cwfreq)
     else:
         fc = default_fc
-    print("** Using coding frequency %s Hz" % fc)
+    print("** Using coding frequency", fc, "Hz")
 
     if options.sample_freq:
         fs = int(options.sample_freq)
     else:
         fs = int(default_fs)
-    print("** Using sampling frequency %s Hz" % fs)
+    print("** Using sampling frequency", fs, "Hz")
 
     if options.wpm:
         wpm = int(options.wpm)
@@ -160,10 +157,10 @@ def main():
         try:
             f = open(statfile)
         except:
-            print("** Could not open %s for reading" % statfile)
+            print("** Could not open", statfile, "for reading")
             exit()
 
-        print("** Getting statistics from %s" % statfile)
+        print("** Getting statistics from", statfile)
         s = np.genfromtxt(statfile, delimiter=',', dtype=None)
         f.close()
 
@@ -189,11 +186,11 @@ def main():
             stats["word_void_avg"] = stats["dotavg"] * 7
 
     else: # not using a stats file
-        print("** Speed: %s wpm" % wpm)
+        print("** Speed:", wpm, "wpm")
         # element time based on http://www.kent-engineers.com/codespeed.htm
         elements_per_minute = wpm * 50 # 50 codes in PARIS
         element_ms = float(60 / elements_per_minute) * 1000 # 60 seconds
-        print("** Element unit is %s milliseconds long." % element_ms)
+        print("** Element unit is", element_ms, "milliseconds long.")
 
         stats["dotavg"] = element_ms
         stats["dotsd"] = 0
@@ -341,7 +338,7 @@ def mkmorse(message, is_coded):
             try:
                 m = inv_morse[e]
             except:
-                print("** Unknown character %s in message.  Update the dictionary." % e)
+                print("** Unknown character", e, "in message.  Update the dictionary.")
                 exit()
 
             for c in m:
@@ -390,7 +387,7 @@ def mkmorse(message, is_coded):
                     voids.append(inter_void)
 
                 else:
-                    print("** Bad symbol in dictionary lookup for %s" % m)
+                    print("** Bad symbol in dictionary lookup for", m)
                     exit()
 
             voids.pop(-1) # remove last inter_void
