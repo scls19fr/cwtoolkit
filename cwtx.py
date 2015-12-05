@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>
 
-from __future__ import division
+from __future__ import division, print_function
 
 import sys
 from os import getpid
@@ -27,7 +27,7 @@ import math
 from optparse import OptionParser
 import numpy as np
 import scipy.signal as signal
-from scikits.audiolab import wavread, wavwrite
+import scipy.io.wavfile
 from hashlib import sha1
 
 version = "0.3b, August 2014"
@@ -84,43 +84,43 @@ def main():
 	(options, args) = parser.parse_args()
 
 	if options.stdout:
-		# don't print messages to stdout if writing file to stdout
+		# don't print(messages to stdout if writing file to stdout
 		stdoutold = sys.stdout
 		sys.stdout = open('/dev/null', 'w')
 	if options.showversion:
-		print "cwtx version", version
-		print "Joshua Davis (cwstats - covert.codes)"
+		print("cwtx version", version)
+		print("Joshua Davis (cwstats - covert.codes)")
 		exit()
 	if options.message:
 		message = options.message.lower()
 		message = message.strip()
 	else:
-		print "** Must specify input message"
+		print("** Must specify input message")
 		parser.print_help()
 		exit()
 	if not options.outfile and not options.stdout:
-		print "** Must specify output wav file with -o or use the -z switch"
+		print("** Must specify output wav file with -o or use the -z switch")
 		parser.print_help()
 		exit()
 	if options.outfile and options.stdout:
-		print "** Must use only one of -o or -z"
+		print("** Must use only one of -o or -z")
 		exit()
 	if options.outfile:
 		outfile = options.outfile
-		print "** Saving output to", outfile
+		print("** Saving output to", outfile)
 	else:
-		print "** Sending output to stdout"
+		print("** Sending output to stdout")
 	if options.cwfreq:
 		fc = float(options.cwfreq)
 	else:
 		fc = default_fc
-	print "** Using coding frequency", fc, "Hz"
+	print("** Using coding frequency", fc, "Hz")
 
 	if options.sample_freq:
 		fs = int(options.sample_freq)
 	else:
 		fs = int(default_fs)
-	print "** Using sampling frequency", fs, "Hz"
+	print("** Using sampling frequency", fs, "Hz")
 
 	if options.wpm:
 		wpm = int(options.wpm)
@@ -129,7 +129,7 @@ def main():
 
 	if options.amplitude:
 		if options.amplitude < 0 or options.amplitude > 1:
-			print "** Amplitude must be greater than zero, less than one."
+			print("** Amplitude must be greater than zero, less than one.")
 			exit()
 		amplitude = options.amplitude
 	else:
@@ -139,28 +139,28 @@ def main():
 		covert_msg = options.covert_msg.lower()
 		covert_msg = covert_msg.strip()
 		if len(covert_msg) > len(message):
-			print "** Covert message must be shorter than the carrier message"
+			print("** Covert message must be shorter than the carrier message")
 			exit()
 
 		if not options.key:
-			print "** Must include a key with the -k option when using -c"
+			print("** Must include a key with the -k option when using -c")
 			exit()
 		if not options.statfile:
-			print "** Must use the -s option when transmitting a covert message."
+			print("** Must use the -s option when transmitting a covert message.")
 			exit()
 	
 	if options.statfile:
 		if options.wpm:
-			print "** Both wpm and stat file given, using stat file"
+			print("** Both wpm and stat file given, using stat file")
 
 		statfile = options.statfile
 		try:
 			f = open(statfile)
 		except:
-			print "** Could not open", statfile, "for reading"
+			print("** Could not open", statfile, "for reading")
 			exit()
 
-		print "** Getting statistics from", statfile
+		print("** Getting statistics from", statfile)
 		s = np.genfromtxt(statfile, delimiter=',', dtype=None)
 		f.close()
 
@@ -170,27 +170,27 @@ def main():
 			"word_void_avg" : round(s[8],2), "word_void_sd" : round(s[9],2) }
 
 		if stats["dotavg"] == 0 or stats["dotsd"] == 0:
-			print "** Provided statistics file ust have at least a dot average and dot standard deviation"
+			print("** Provided statistics file ust have at least a dot average and dot standard deviation")
 			exit()
 		if stats["dashavg"] == 0:
-			print "** No dash average, deriving from dot"
+			print("** No dash average, deriving from dot")
 			stats["dashavg"] = stats["dotavg"] * 3
 		if stats["inter_void_avg"] == 0:
-			print "** No inter-symbol average, deriving from dot"
+			print("** No inter-symbol average, deriving from dot")
 			stats["inter_void_avg"] = stats["dotavg"]
 		if stats["letter_void_avg"] == 0:
-			print "** No inter-letter average, deriving from dot"
+			print("** No inter-letter average, deriving from dot")
 			stats["letter_void_avg"] = stats["dotavg"] * 3
 		if stats["word_void_avg"] == 0:
-			print "** No inter-word average, deriving from dot"
+			print("** No inter-word average, deriving from dot")
 			stats["word_void_avg"] = stats["dotavg"] * 7
 
 	else: # not using a stats file
-		print "** Speed:", wpm, "wpm"
+		print("** Speed:", wpm, "wpm")
 		# element time based on http://www.kent-engineers.com/codespeed.htm
 		elements_per_minute = wpm * 50 # 50 codes in PARIS
 		element_ms = float(60 / elements_per_minute) * 1000 # 60 seconds
-		print "** Element unit is", element_ms, "milliseconds long."
+		print("** Element unit is", element_ms, "milliseconds long.")
 
 		stats["dotavg"] = element_ms
 		stats["dotsd"] = 0
@@ -215,7 +215,7 @@ def main():
 
 	symbols, voids = mkmorse(message, 0)
 
-	print "** Generating audio"
+	print("** Generating audio")
 	output = list()
 	for x in range(int(front_buffer * (fs/1000))): # give some initial void to the output
 		output.append(0)
@@ -246,7 +246,7 @@ def main():
 		try:
 			options.noise.index(',')
 		except:
-			print "** -n argument requires average and standard deviation seperated by a comma, e.g. -n 0,2 - no spaces"
+			print("** -n argument requires average and standard deviation seperated by a comma, e.g. -n 0,2 - no spaces")
 			exit()
 
 		noise_avg, noise_sd = options.noise.split(',')
@@ -264,7 +264,7 @@ def main():
 	if not options.outfile:
 		outfile = "/tmp/cwtx"+str(getpid())
 
-	wavwrite(output, outfile, fs=fs, enc=encoding)
+	scipy.io.wavfile.write(outfile, fs, output)
 
 	if not options.outfile:
 		sys.stdout = stdoutold
@@ -277,8 +277,8 @@ def main():
 
 		exit()
 
-	print "** Finished."
-	print ""
+	print("** Finished.")
+	print("")
 
 def mktime(avg, sd, symbol):
 	global statfile
@@ -338,7 +338,7 @@ def mkmorse(message, is_coded):
 			try:
 				m = inv_morse[e]
 			except:
-				print "** Unknown character", e, "in message.  Update the dictionary."
+				print("** Unknown character", e, "in message.  Update the dictionary.")
 				exit()
 
 			for c in m:
@@ -387,7 +387,7 @@ def mkmorse(message, is_coded):
 					voids.append(inter_void)
 
 				else:
-					print "** Bad symbol in dictionary lookup for", m
+					print("** Bad symbol in dictionary lookup for", m)
 					exit()
 
 			voids.pop(-1) # remove last inter_void

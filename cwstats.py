@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>
 
-from __future__ import division
+from __future__ import division, print_function
 
 import sys
 from os import getpid
@@ -28,7 +28,8 @@ import random
 from optparse import OptionParser
 import numpy as np
 import scipy.signal as signal
-from scikits.audiolab import wavread, wavwrite
+import scipy
+import scipy.io.wavfile
 from hashlib import sha1
 
 version = "0.3b, August 2014"
@@ -71,24 +72,24 @@ def main():
 	(options, args) = parser.parse_args()
 
 	if options.showversion:
-		print "cwstats version", version
-		print "Joshua Davis (cwstats - covert.codes)"
+		print("cwstats version", version)
+		print("Joshua Davis (cwstats - covert.codes)")
 		exit()
 
 	if not options.wavfile and not options.stdin:
-		print "** Must specify an input file with -o or use the -z option"
-		print ""
+		print("** Must specify an input file with -o or use the -z option")
+		print("")
 		parser.print_help()
 		exit()
 
 	if options.wavfile and options.stdin:
-		print "** Must us only one of -o or -z"
+		print("** Must us only one of -o or -z")
 		exit()
 
 	if options.tolerance:
 		tolerance = float(options.tolerance)/100
 		if tolerance > 1:
-			print "** Tolerance must be between 0 and 100"
+			print("** Tolerance must be between 0 and 100")
 			exit()
 	else:
 		tolerance = float(default_tolerance)/100
@@ -103,21 +104,21 @@ def main():
 
 	if options.code_key or options.cstats:
 		if not options.code_key or not options.cstats:
-			print "** The -c and -k options must be used together"
+			print("** The -c and -k options must be used together")
 			exit()
 
 		try:
 			f = open(options.cstats, "r")
 		except:
-			print "** Could not open", options.cstats, "for reading"
+			print("** Could not open", options.cstats, "for reading")
 			exit()
 
 		statstr = f.read()
 		f.close()
-		print "** Read statistics for covert demodulation from", options.cstats
+		print("** Read statistics for covert demodulation from", options.cstats)
 
 	if options.stdin:
-		print "** Reading from stdin"
+		print("** Reading from stdin")
 		data = sys.stdin.read()
 
 		outfile = "/tmp/cwstats"+str(getpid())
@@ -129,17 +130,17 @@ def main():
 	else:
 		wavfile = options.wavfile
 
-	data, fs, encoding = wavread(wavfile)
-	print ""
-	print "** Read", len(data), "samples from", wavfile, "with sample frequency", fs, "Hz and encoding", encoding
+	fs, data = scipy.io.wavfile.read(wavfile)
+	print("")
+	print("** Read", len(data), "samples from", wavfile, "with sample frequency", fs, "Hz")
 
-	print "** Signal average:", np.average(data)
+	print("** Signal average:", np.average(data))
 
 	if options.realign:
-		print "** Vertically realigning signal by", options.realign
+		print("** Vertically realigning signal by", options.realign)
 		for i in range(len(data)):
 			data[i] = data[i] + float(options.realign)
-		print "** Signal average:", np.average(data)
+		print("** Signal average:", np.average(data))
 
 	# want mono
 	try:
@@ -160,17 +161,17 @@ def main():
 		fc = int(round(abs(fdomain[index] * fs)))
 
 	if fc == 0:
-		print "** Dominant frequency is zero.  Vertically realigning the signal with -a may fix this.  You can also specify a dominant frequency with -f."
+		print("** Dominant frequency is zero.  Vertically realigning the signal with -a may fix this.  You can also specify a dominant frequency with -f.")
 		exit()
 	else:
-		print "** Using dominant frequency:", fc, "Hz"
+		print("** Using dominant frequency:", fc, "Hz")
 
 	if options.nofilter:
 		filtered_signal = data
 	else:
 		f_cutoff_h = int(fc + filter_bw/2)
 		f_cutoff_l = int(fc - filter_bw/2)
-		print "** Filtering to between", f_cutoff_l, "and", f_cutoff_h, "Hz"
+		print("** Filtering to between", f_cutoff_l, "and", f_cutoff_h, "Hz")
 
 		f_nyq = fs/2
 		numtaps = fs/f_cutoff_l
@@ -188,17 +189,17 @@ def main():
 	dots,dashes = symbols_to_beeps(symbols)
 
 	if not dots:
-		print "** No symbols found in input"
+		print("** No symbols found in input")
 		exit()
 
 	dotavg = np.average(dots)
-	print "** Avg. dot length:", dotavg, "ms"
+	print("** Avg. dot length:", dotavg, "ms")
 
 	# Remove any leading or trailing voids
 	if rects[0] == 0:
 		voids.pop(0)
 	
-	print "** Decoding with tolerance:", tolerance, "%"
+	print("** Decoding with tolerance:", tolerance, "%")
 
 	# categorize voids, for statistics
 	lvoids = list()
@@ -213,11 +214,11 @@ def main():
 			svoids.append(voids[i])
 	
 	if not lvoids:
-		print "** No word delineation detected in message."
+		print("** No word delineation detected in message.")
 	if not mvoids:
-		print "** No letter delineation detected in message."
+		print("** No letter delineation detected in message.")
 	if not svoids:
-		print "** No symbol delineation detected in message."
+		print("** No symbol delineation detected in message.")
 
 	code = symbols_to_morse(symbols, voids, dotavg)
 
@@ -231,45 +232,45 @@ def main():
 	epm = (len(symbols)*60)/duration
 
 	if options.stats:
-		print "** Message has", len(symbols), "symbols and", len(voids), "voids."
-		print ""
-		print "----------"
-		print "| Number of dots:", len(dots)
-		print "| Avg. dot length:", dotavg, "ms"
-		print "| Dot stdev:", dotsd, "ms"
-		print "|"	
-		print "| Number of dashes:", len(dashes)
-		print "| Avg. dash length:", dashavg, "ms"
-		print "| Dash stdev:", dashsd, "ms"
-		print "|"	
-		print "| Number of intra-letter spaces", len(svoids)
-		print "| Avg. intra-letter spacing length:", svoidavg, "ms"
-		print "| Intra-letter spacing stdev:", svoidsd, "ms"
-		print "|"
-		print "| Number of inter-letter spaces:", len(mvoids)
-		print "| Avg. inter-letter spacing length:", mvoidavg, "ms"
-		print "| Inter-letter spacing stdev:", mvoidsd, "ms"
-		print "|"	
-		print "| Number of inter-word spaces:", len(lvoids)
-		print "| Avg. Inter-word spacing length:", lvoidavg, "ms"
-		print "| Inter-word spacing stdev:", lvoidsd, "ms"
-		print "|"
-		print "| Signal duration:", duration, "sec."
-		print "| Approx. elements (dots, dashes) per minute:", epm
-		print "----------"
+		print("** Message has", len(symbols), "symbols and", len(voids), "voids.")
+		print("")
+		print("----------")
+		print("| Number of dots:", len(dots))
+		print("| Avg. dot length:", dotavg, "ms")
+		print("| Dot stdev:", dotsd, "ms")
+		print("|")
+		print("| Number of dashes:", len(dashes))
+		print("| Avg. dash length:", dashavg, "ms")
+		print("| Dash stdev:", dashsd, "ms")
+		print("|")
+		print("| Number of intra-letter spaces", len(svoids))
+		print("| Avg. intra-letter spacing length:", svoidavg, "ms")
+		print("| Intra-letter spacing stdev:", svoidsd, "ms")
+		print("|")
+		print("| Number of inter-letter spaces:", len(mvoids))
+		print("| Avg. inter-letter spacing length:", mvoidavg, "ms")
+		print("| Inter-letter spacing stdev:", mvoidsd, "ms")
+		print("|")
+		print("| Number of inter-word spaces:", len(lvoids))
+		print("| Avg. Inter-word spacing length:", lvoidavg, "ms")
+		print("| Inter-word spacing stdev:", lvoidsd, "ms")
+		print("|")
+		print("| Signal duration:", duration, "sec.")
+		print("| Approx. elements (dots, dashes) per minute:", epm)
+		print("----------")
 
 	if options.statfile:
 		try:
 			f = open(statfile, "w")
 		except:
-			print "** Could not open", statfile, "for writing"
+			print("** Could not open", statfile, "for writing")
 			exit()
 
 		statstr = "%.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f"\
 			% (dotavg, dotsd, dashavg, dashsd, svoidavg, svoidsd, mvoidavg, mvoidsd, lvoidavg, lvoidsd)
 		f.write(statstr)
 		f.close()
-		print "** Wrote statistics to", statfile
+		print("** Wrote statistics to", statfile)
 
 
 
@@ -288,18 +289,18 @@ def main():
 			else:
 				sys.stdout.write(code[i])
 
-		print ""
+		print("")
 
-	print ""
-	print "@@ Message:", message
+	print("")
+	print("@@ Message:", message)
 
 	if options.code_key:
 		decoded = decode(symbols, options.code_key, statstr, code)
-		print "@@ Decoded:", decoded
-	print ""
+		print("@@ Decoded:", decoded)
+	print("")
 
-	print "** Finished"
-	print ""
+	print("** Finished")
+	print("")
 
 #
 # Input a list of times
@@ -439,7 +440,7 @@ def signal_to_rects(signal, tolerance, fs, fc, window_alts):
 	winsz =  window_alts * int( math.ceil(fs/fc) ) # window_alts alternations of the signal
 	winnum = int( math.floor(len(signal)/winsz) )
 
-	print "** Signal alternations per window:", window_alts
+	print("** Signal alternations per window:", window_alts)
 
 	rects = list()
 	for i in range(winnum):
@@ -577,7 +578,7 @@ def morse_to_english(morse_input):
 			letter.append(morse_input[i])
 			i = i + 1
 
-	# print out the final letter
+	# print(out the final letter
 	try:
 		alpha = morse[''.join(letter)]
 	except:
@@ -617,9 +618,9 @@ def print_rects(rects):
 				ones = 0
 			count = count + 1
 
-	print results
-	print ""
-	print "symbols in rects:", symbols
+	print(results)
+	print("")
+	s("symbols in rects:", symbols)
 
 
 #########
